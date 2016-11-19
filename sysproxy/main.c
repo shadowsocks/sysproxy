@@ -89,7 +89,7 @@ int apply_connect(INTERNET_PER_CONN_OPTION_LIST* options, LPTSTR conn)
         return SYSCALL_FAILED;
     }
 
-    result = InternetSetOption(NULL, INTERNET_OPTION_SETTINGS_CHANGED, NULL, 0);
+    result = InternetSetOption(NULL, INTERNET_OPTION_PROXY_SETTINGS_CHANGED, NULL, 0);
     if (!result)
     {
         reportWindowsError(_T("propagating changes"));
