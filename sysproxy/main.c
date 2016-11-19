@@ -22,7 +22,7 @@ enum RET_ERRORS
 };
 
 
-void usage(PCTSTR binName)
+void usage(LPCTSTR binName)
 {
     _tprintf(_T("Usage: %s global <proxy server>\n"), binName);
     _tprintf(_T("       %s pac <pac url>\n"), binName);
@@ -31,7 +31,7 @@ void usage(PCTSTR binName)
     exit(INVALID_FORMAT);
 }
 
-void reportWindowsError(PCTSTR action)
+void reportWindowsError(LPCTSTR action)
 {
     LPTSTR pErrMsg = NULL;
     DWORD errCode = GetLastError();
@@ -48,7 +48,7 @@ void reportWindowsError(PCTSTR action)
 }
 
 
-void reportError(PCTSTR action)
+void reportError(LPCTSTR action)
 {
     _ftprintf(stderr, _T("Error %s\n"), action);
 }
@@ -78,7 +78,7 @@ void initialize(INTERNET_PER_CONN_OPTION_LIST* options, int option_count)
 }
 
 
-int apply_connect(INTERNET_PER_CONN_OPTION_LIST* options, PTSTR conn)
+int apply_connect(INTERNET_PER_CONN_OPTION_LIST* options, LPTSTR conn)
 {
     options->pszConnection = conn;
 
@@ -163,7 +163,7 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
 }
 
 
-int _tmain(int argc, PTSTR argv[])
+int _tmain(int argc, LPTSTR argv[])
 {
 #ifdef _UNICODE
     _setmode(_fileno(stdin), _O_U16TEXT);
