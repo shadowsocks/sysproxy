@@ -126,7 +126,10 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
             return NO_MEMORY;
         }
 
-        lpRasEntryName[0].dwSize = sizeof(RASENTRYNAME);
+        for (DWORD i = 0; i < dwEntries; i++)
+        {
+            lpRasEntryName[i].dwSize = sizeof(RASENTRYNAME);
+        }
 
         dwRet = RasEnumEntries(NULL, NULL, lpRasEntryName, &dwCb, &dwEntries);
 
