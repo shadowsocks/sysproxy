@@ -24,8 +24,8 @@ enum RET_ERRORS
 
 void usage(LPCTSTR binName)
 {
-    _tprintf(_T("Usage: %s global <proxy server> [<bypass>]\n"), binName);
-    _tprintf(_T("       %s pac <pac url>\n"), binName);
+    _tprintf(_T("Usage: %s global <proxy-server> [<bypass-list>]\n"), binName);
+    _tprintf(_T("       %s pac <pac-url>\n"), binName);
     _tprintf(_T("       %s off\n"), binName);
 
     exit(INVALID_FORMAT);
@@ -67,7 +67,7 @@ void initialize(INTERNET_PER_CONN_OPTION_LIST* options, int option_count)
     options->dwOptionCount = option_count;
     options->dwOptionError = 0;
 
-    options->pOptions = (INTERNET_PER_CONN_OPTION*)calloc(option_count, sizeof(INTERNET_PER_CONN_OPTION));
+    options->pOptions = calloc(option_count, sizeof(INTERNET_PER_CONN_OPTION));
 
     if (!options->pOptions)
     {
@@ -109,6 +109,7 @@ int apply_connect(INTERNET_PER_CONN_OPTION_LIST* options, LPTSTR conn)
 
 int apply(INTERNET_PER_CONN_OPTION_LIST* options)
 {
+    int ret;
     DWORD dwCb = 0;
     DWORD dwRet;
     DWORD dwEntries = 0;
@@ -123,7 +124,8 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
         if (lpRasEntryName == NULL)
         {
             reportError(_T("HeapAlloc"));
-            return NO_MEMORY;
+            ret = NO_MEMORY;
+            goto failed;
         }
 
         for (DWORD i = 0; i < dwEntries; i++)
@@ -132,39 +134,41 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
         }
 
         dwRet = RasEnumEntries(NULL, NULL, lpRasEntryName, &dwCb, &dwEntries);
+    }
 
-        int ret;
+    if (ERROR_SUCCESS != dwRet)
+    {
+        reportError(_T("RasEnumEntries"));
 
-        if (ERROR_SUCCESS != dwRet)
+        ret = SYSCALL_FAILED;
+        goto free_heap;
+    }
+    else
+    {
+        // First set default connection.
+        if ((ret = apply_connect(options, NULL)) > RET_NO_ERROR)
+            goto free_heap;
+
+        if (dwEntries > 0)
         {
-            reportError(_T("RasEnumEntries"));
-
-            ret = SYSCALL_FAILED;
-        }
-        else
-        {
-            // First set default connection.
-            ret = apply_connect(options, NULL);
-
-            for (DWORD i = 0; i < dwEntries && ret == RET_NO_ERROR; i++)
+            for (DWORD i = 0; i < dwEntries; i++)
             {
-                ret = apply_connect(options, lpRasEntryName[i].szEntryName);
+                if ((ret = apply_connect(options, lpRasEntryName[i].szEntryName)) > RET_NO_ERROR)
+                    goto free_heap;
             }
         }
-
-        HeapFree(GetProcessHeap(), 0, lpRasEntryName);
-
-        return ret;
     }
 
-    if (dwEntries >= 1)
-    {
-        reportError(_T("acquire buffer size"));
-        return SYSCALL_FAILED;
-    }
+    ret = RET_NO_ERROR;
 
-    // No ras entry, set default only.
-    return apply_connect(options, NULL);
+free_heap:
+    HeapFree(GetProcessHeap(), 0, lpRasEntryName);
+    /* fall through */
+failed:
+    free(options->pOptions);
+    options->pOptions = NULL;
+
+    return ret;
 }
 
 
@@ -190,6 +194,12 @@ int _tmain(int argc, LPTSTR argv[])
     }
     else if (_tcscmp(argv[1], _T("global")) == 0 && argc >= 3)
     {
+        if (argc > 4)
+        {
+            _tprintf(_T("Error: bypass list shouldn't contain spaces, please check parameters.\n"));
+            usage(argv[0]);
+        }
+
         initialize(&options, 3);
 
         options.pOptions[0].Value.dwValue = PROXY_TYPE_PROXY | PROXY_TYPE_DIRECT;
@@ -199,12 +209,7 @@ int _tmain(int argc, LPTSTR argv[])
 
         options.pOptions[2].dwOption = INTERNET_PER_CONN_PROXY_BYPASS;
 
-        if (argc > 4)
-        {
-            _tprintf(_T("Error: bypass list shouldn't contain spaces, please check parameters.\n"));
-            usage(argv[0]);
-        }
-        else if (argc == 4)
+        if (argc == 4)
         {
             options.pOptions[2].Value.pszValue = argv[3];
         }
@@ -227,8 +232,5 @@ int _tmain(int argc, LPTSTR argv[])
         usage(argv[0]);
     }
 
-
-    apply(&options);
-
-    return RET_NO_ERROR;
+    return apply(&options);
 }
