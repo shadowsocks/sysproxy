@@ -69,12 +69,10 @@ void initialize(INTERNET_PER_CONN_OPTION_LIST* options, int option_count)
 
     options->pOptions = calloc(option_count, sizeof(INTERNET_PER_CONN_OPTION));
 
-    if (!options->pOptions)
+    if (options->pOptions == NULL)
     {
         exit(NO_MEMORY);
     }
-
-    options->pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
 }
 
 
@@ -190,6 +188,7 @@ int _tmain(int argc, LPTSTR argv[])
     {
         initialize(&options, 1);
 
+        options.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
         options.pOptions[0].Value.dwValue = PROXY_TYPE_AUTO_DETECT | PROXY_TYPE_DIRECT;
     }
     else if (_tcscmp(argv[1], _T("global")) == 0 && argc >= 3)
@@ -202,6 +201,7 @@ int _tmain(int argc, LPTSTR argv[])
 
         initialize(&options, 3);
 
+        options.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
         options.pOptions[0].Value.dwValue = PROXY_TYPE_PROXY | PROXY_TYPE_DIRECT;
 
         options.pOptions[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
@@ -222,6 +222,7 @@ int _tmain(int argc, LPTSTR argv[])
     {
         initialize(&options, 2);
 
+        options.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
         options.pOptions[0].Value.dwValue = PROXY_TYPE_AUTO_PROXY_URL;
 
         options.pOptions[1].dwOption = INTERNET_PER_CONN_AUTOCONFIG_URL;
