@@ -140,6 +140,7 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
         }
         else
         {
+            // First set default connection.
             ret = apply_connect(options, NULL);
 
             for (DWORD i = 0; i < dwEntries && ret == RET_NO_ERROR; i++)
@@ -159,7 +160,8 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
         return SYSCALL_FAILED;
     }
 
-    return RET_NO_ERROR;
+    // No ras entry, set default only.
+    return apply_connect(options, NULL);
 }
 
 
