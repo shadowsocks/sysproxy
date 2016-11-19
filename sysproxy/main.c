@@ -178,6 +178,8 @@ int _tmain(int argc, LPTSTR argv[])
 	}
 
 	INTERNET_PER_CONN_OPTION_LIST options;
+	memset(&options, 0, sizeof(INTERNET_PER_CONN_OPTION_LIST));
+
 	if (_tcscmp(argv[1], _T("off")) == 0)
 	{
 		initialize(&options, 1);
