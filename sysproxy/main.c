@@ -128,9 +128,9 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
 		dwRet = RasEnumEntries(NULL, NULL, lpRasEntryName, &dwCb, &dwEntries);
 	}
 
-	if (ERROR_SUCCESS != dwRet)
+	if (dwRet != ERROR_SUCCESS)
 	{
-		reportError(_T("RasEnumEntries"));
+		_ftprintf(stderr, _T("Error RasEnumEntries: %d\n"), dwRet);
 
 		ret = SYSCALL_FAILED;
 		goto free_heap;
@@ -155,6 +155,8 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
 
 free_heap:
 	HeapFree(GetProcessHeap(), 0, lpRasEntryName);
+	lpRasEntryName = NULL;
+
 	/* fall through */
 failed:
 	free(options->pOptions);
@@ -219,7 +221,7 @@ int _tmain(int argc, LPTSTR argv[])
 		initialize(&options, 2);
 
 		options.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
-		options.pOptions[0].Value.dwValue = PROXY_TYPE_AUTO_PROXY_URL;
+		options.pOptions[0].Value.dwValue = PROXY_TYPE_AUTO_PROXY_URL | PROXY_TYPE_DIRECT;
 
 		options.pOptions[1].dwOption = INTERNET_PER_CONN_AUTOCONFIG_URL;
 		options.pOptions[1].Value.pszValue = argv[2];
