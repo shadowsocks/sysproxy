@@ -107,6 +107,11 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
 	DWORD dwEntries = 0;
 	LPRASENTRYNAME lpRasEntryName = NULL;
 
+	// Set LAN
+	if ((ret = apply_connect(options, NULL)) > RET_NO_ERROR)
+		goto free_calloc;
+
+	// Find connections and apply proxy settings
 	dwRet = RasEnumEntries(NULL, NULL, lpRasEntryName, &dwCb, &dwEntries);
 
 	if (dwRet == ERROR_BUFFER_TOO_SMALL)
@@ -117,7 +122,7 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
 		{
 			reportError(_T("HeapAlloc"));
 			ret = NO_MEMORY;
-			goto failed;
+			goto free_calloc;
 		}
 
 		for (DWORD i = 0; i < dwEntries; i++)
@@ -133,32 +138,27 @@ int apply(INTERNET_PER_CONN_OPTION_LIST* options)
 		_ftprintf(stderr, _T("Error RasEnumEntries: %d\n"), dwRet);
 
 		ret = SYSCALL_FAILED;
-		goto free_heap;
+		goto free_ras;
 	}
 	else
 	{
-		// First set default connection.
-		if ((ret = apply_connect(options, NULL)) > RET_NO_ERROR)
-			goto free_heap;
-
 		if (dwEntries > 0)
 		{
 			for (DWORD i = 0; i < dwEntries; i++)
 			{
 				if ((ret = apply_connect(options, lpRasEntryName[i].szEntryName)) > RET_NO_ERROR)
-					goto free_heap;
+					goto free_ras;
 			}
 		}
 	}
 
 	ret = RET_NO_ERROR;
 
-free_heap:
+free_ras:
 	HeapFree(GetProcessHeap(), 0, lpRasEntryName);
 	lpRasEntryName = NULL;
-
 	/* fall through */
-failed:
+free_calloc:
 	free(options->pOptions);
 	options->pOptions = NULL;
 
