@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <windows.h>
 #include <Wininet.h>
+#include <wchar.h>
 #include <tchar.h>
 #include <ras.h>
 #include <raserror.h>
@@ -27,7 +28,10 @@ void usage(LPCTSTR binName)
 	_tprintf(_T("Usage: %s global <proxy-server> [<bypass-list>]\n"), binName);
 	_tprintf(_T("             bypass list is a string like: localhost;127.*;10.* without trailing semicolon.\n"));
 	_tprintf(_T("       %s pac <pac-url>\n"), binName);
-	_tprintf(_T("       %s off\n"), binName);
+	_tprintf(_T("       %s query\n"), binName);
+	_tprintf(_T("       %s set <flags> [<proxy-server> [<bypass-list> [<pac-url>]]]\n"), binName);
+	_tprintf(_T("             <flags> is bitwise combination of INTERNET_PER_CONN_FLAGS.\n"));
+	_tprintf(_T("             \"-\" is a placeholder to keep the original value.\n"));
 
 	exit(INVALID_FORMAT);
 }
@@ -165,6 +169,57 @@ free_calloc:
 	return ret;
 }
 
+int query(INTERNET_PER_CONN_OPTION_LIST* options)
+{
+	int ret;
+
+	DWORD dwLen = sizeof(INTERNET_PER_CONN_OPTION_LIST);
+
+	// On Windows 7 or above (IE8+), query with INTERNET_PER_CONN_FLAGS_UI is recommended.
+	// See https://msdn.microsoft.com/en-us/library/windows/desktop/aa385145(v=vs.85).aspx
+	options->pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS_UI;
+
+	options->pOptions[1].dwOption = INTERNET_PER_CONN_PROXY_SERVER;
+	options->pOptions[2].dwOption = INTERNET_PER_CONN_PROXY_BYPASS;
+	options->pOptions[3].dwOption = INTERNET_PER_CONN_AUTOCONFIG_URL;
+
+	if (!InternetQueryOption(NULL, INTERNET_OPTION_PER_CONNECTION_OPTION, options, &dwLen))
+	{
+		// Set option to INTERNET_PER_CONN_FLAGS and try again to compatible with older versions of Windows.
+		options->pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
+
+		if (!InternetQueryOption(NULL, INTERNET_OPTION_PER_CONNECTION_OPTION, options, &dwLen))
+		{
+			reportWindowsError(_T("query options"));
+			ret = SYSCALL_FAILED;
+			goto free_calloc;
+		}
+	}
+
+	_tprintf(_T("%d\n%s\n%s\n%s"),
+		options->pOptions[0].Value.dwValue,
+		options->pOptions[1].Value.pszValue,
+		options->pOptions[2].Value.pszValue,
+		options->pOptions[3].Value.pszValue);
+
+	for (DWORD i = 1; i < options->dwOptionCount; ++i)
+	{
+		if (options->pOptions[i].Value.pszValue == NULL)
+		{
+			continue;
+		}
+		GlobalFree(options->pOptions[i].Value.pszValue);
+		options->pOptions[i].Value.pszValue = NULL;
+	}
+
+	ret = RET_NO_ERROR;
+
+free_calloc:
+	free(options->pOptions);
+	options->pOptions = NULL;
+
+	return ret;
+}
 
 int _tmain(int argc, LPTSTR argv[])
 {
@@ -182,14 +237,7 @@ int _tmain(int argc, LPTSTR argv[])
 	INTERNET_PER_CONN_OPTION_LIST options;
 	memset(&options, 0, sizeof(INTERNET_PER_CONN_OPTION_LIST));
 
-	if (_tcscmp(argv[1], _T("off")) == 0)
-	{
-		initialize(&options, 1);
-
-		options.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
-		options.pOptions[0].Value.dwValue = PROXY_TYPE_AUTO_DETECT | PROXY_TYPE_DIRECT;
-	}
-	else if (_tcscmp(argv[1], _T("global")) == 0 && argc >= 3)
+	if (_tcscmp(argv[1], _T("global")) == 0 && argc >= 3)
 	{
 		if (argc > 4)
 		{
@@ -225,6 +273,48 @@ int _tmain(int argc, LPTSTR argv[])
 
 		options.pOptions[1].dwOption = INTERNET_PER_CONN_AUTOCONFIG_URL;
 		options.pOptions[1].Value.pszValue = argv[2];
+	}
+	else if (_tcscmp(argv[1], _T("query")) == 0)
+	{
+		initialize(&options, 4);
+		return query(&options);
+	}
+	else if (_tcscmp(argv[1], _T("set")) == 0)
+	{
+		if (argc > 6 || argc < 3)
+		{
+			usage(argv[0]);
+		}
+
+		DWORD flags = _ttoi(argv[2]);
+		if (flags > 0x0f || flags < 1)
+		{
+			_tprintf(_T("Error: flags is not accepted\n"));
+			usage(argv[0]);
+		}
+
+		DWORD count = argc - 2, argIdx = 2, optIdx = 1;
+		DWORD opts[] = { 0, 0, INTERNET_PER_CONN_FLAGS,
+			INTERNET_PER_CONN_PROXY_SERVER, INTERNET_PER_CONN_PROXY_BYPASS,
+			INTERNET_PER_CONN_AUTOCONFIG_URL };
+
+		initialize(&options, count);
+
+		options.pOptions[0].dwOption = INTERNET_PER_CONN_FLAGS;
+		options.pOptions[0].Value.dwValue = flags;
+
+		while (argIdx++ <= count)
+		{
+			if (argv[argIdx][0] == _T('-'))
+			{
+				continue;
+			}
+			options.pOptions[optIdx].dwOption = opts[argIdx];
+			options.pOptions[optIdx].Value.pszValue = argv[argIdx];
+			++optIdx;
+		}
+
+		options.dwOptionCount = optIdx;
 	}
 	else
 	{
